@@ -10,40 +10,66 @@ class Snapshot:
     snapshot_id = 0
     balance = 1000
     states = {}
+    # assuming current process is 2
+    # {(1, 2): {'local_state': None, 'channels': {'1': {'is_finished': False, 'messages': []}, '3': {'is_finished': False, 'messages': []}}, 'is_finished': False}}
+    process_id = None
     balance_mutex = threading.Lock()
+    state_mutex = threading.Lock()
 
     def send_money(self, amount):
         Snapshot.balance_mutex.acquire()
-
-
+        Snapshot.balance -= amount
         Snapshot.balance_mutex.release()
 
-    def rcv_money(self, amount):
-        pass
+    def rcv_money(self, message):
+        Snapshot.balance_mutex.acquire()
+        Snapshot.balance += message['amount'];
+        Snapshot.balance_mutex.release()
+        self.save_channel_state(message)
 
-    def start_snapshot(self):
-        pass
+    def start_snapshot(self, snapshot_identifier):
+        #snapshot_identifier = (Snapshot.snapshot_id, Snapshot.process_id) in case of terminal input
+        self.save_local_state(snapshot_identifier)
+        self.send_marker(snapshot_identifier)
 
-    def start_recording(self):
+    def check_marker_status(self, message):
         pass
+    # 2 cases possible
+    # 1. (Snapshot_id, process_id) not present in Snapshot_status , call start_snapshot(message['snapshot_id']), mark receiver channel as finished so that msgs not saved for this channel
+    # 2. (Snapshot_id, process_id) present in Snapshot_status , mark receiver channel as finished so that no further msgs saved for this channel, check if all channels finished, mark snapshot as finshed
 
-    def rcv_marker(self, message):
-        pass
-
-    def stop_recording(self):
-        pass
+    def send_marker(self, snapshot_identifier):
+        message = {'sender_id': Snapshot.process_id, 'message_type': 'MARKER', 'snapshot_id': snapshot_identifier}
+        self.send_broadcast_message(message)
 
     def send_message(self, message):
         pass
 
-    def save_local_state(self, state):
-        pass
+        # send message, HOW TO?
 
-    def channel_state(self, message):
-        pass
+    def save_local_state(self, index):
+        Snapshot.state_mutex.acquire()
+        if index not in Snapshot.states:
+            temp_arr = {}
+            for i in config.keys():
+                if i != Snapshot.process_id:
+                    temp_arr[i] = {'is_finished': False, 'messages': []}
+            Snapshot.states[index] = {'local_state': None, 'is_finished': False, 'channels': temp_arr}
+        Snapshot.balance_mutex.acquire()
+        Snapshot.states[index]['local_state'] = Snapshot.balance
+        Snapshot.balance_mutex.release()
+        Snapshot.state_mutex.release()
 
-    def send_broad_message(self, message):
+    def save_channel_state(self, message):
         pass
+    # add to all channels for which snapshot and channel not finished
+
+    def send_broadcast_message(self, message):
+        for i in config.keys():
+            if i != Snapshot.process_id:
+                message['receiver_id'] = i
+                pass
+            # send message, HOW TO?
 
 
 
@@ -61,7 +87,7 @@ def setup_receive_channels(s):
 def setup_send_channels():
     while True:
         for i in config.keys():
-            if not i == process_id and not i in send_channels.keys():
+            if not i == Snapshot.process_id and not i in send_channels.keys():
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 host = '127.0.0.1'
                 port = config[i]
@@ -94,6 +120,11 @@ def receive_message():
             try:
                 msg = socket.recv(4096)
 
+                #check message_type
+                #if rcv money, call Snapshot.rcv_money(message)
+                #if marker
+                #call  Snapshot.check_marker_status
+
                 if msg:
                     print "Message received: " + msg
             except:
@@ -107,13 +138,13 @@ def receive_message():
 with open("config.json", "r") as configFile:
     config = json.load(configFile)
 
-process_id = raw_input()
+Snapshot.process_id = raw_input()
 send_channels = {}
 recv_channels = []
 message_queue = Queue.Queue()
 lock=threading.Lock()
 HOST = ''
-PORT = config[process_id]
+PORT = config[Snapshot.process_id]
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setblocking(0)
 s.bind((HOST, PORT))
