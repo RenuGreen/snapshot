@@ -120,14 +120,13 @@ def receive_message():
         for socket in recv_channels:
             try:
                 msg = socket.recv(4096)
-
-                #check message_type
-                #if rcv money, call Snapshot.rcv_money(message)
-                #if marker
-                #call  Snapshot.check_marker_status
-
                 if msg:
-                    print "Message received: " + msg
+                    msg = json.loads(msg)
+                    msg_type = msg["message_type"]
+                    if msg_type == "TRANSFER":
+                        Snapshot.rcv_money(message)
+                    else:
+                        Snapshot.check_marker_status(message)
             except:
                 time.sleep(1)
                 continue
