@@ -20,7 +20,9 @@ class Snapshot:
         Snapshot.balance_mutex.acquire()
         Snapshot.balance -= amount
         Snapshot.balance_mutex.release()
-
+        message = {'sender_id': Snapshot.process_id, 'message_type': 'TRANSFER', 'amount': amount}
+        send_message(message)
+        
     def rcv_money(self, message):
         Snapshot.balance_mutex.acquire()
         Snapshot.balance += message['amount'];
