@@ -5,6 +5,13 @@ import threading
 import time
 import json
 import Queue
+import traceback
+
+send_channels = {}
+recv_channels = []
+message_queue = Queue.Queue()
+lock=threading.Lock()
+message_queue_lock = threading.Lock()
 
 class Snapshot:
     snapshot_id = 0
@@ -16,18 +23,19 @@ class Snapshot:
     balance_mutex = threading.Lock()
     state_mutex = threading.Lock()
 
-    def send_money(self, amount):
+    def send_money(self, amount, receiver_id):
         Snapshot.balance_mutex.acquire()
         Snapshot.balance -= amount
         Snapshot.balance_mutex.release()
-        message = {'sender_id': Snapshot.process_id, 'message_type': 'TRANSFER', 'amount': amount}
-        send_message(message)
-        
-    def rcv_money(self, message):
+        message = {'receiver_id':receiver_id, 'sender_id': Snapshot.process_id, 'message_type': 'TRANSFER', 'amount': amount}
+        self.send_message(message)
+
+    @staticmethod
+    def rcv_money(message):
         Snapshot.balance_mutex.acquire()
         Snapshot.balance += message['amount'];
+        print Snapshot.balance
         Snapshot.balance_mutex.release()
-        self.save_channel_state(message)
 
     def start_snapshot(self, snapshot_identifier):
         #snapshot_identifier = (Snapshot.snapshot_id, Snapshot.process_id) in case of terminal input
@@ -45,9 +53,10 @@ class Snapshot:
         self.send_broadcast_message(message)
 
     def send_message(self, message):
-        message_queue_lock.acquire
+        global message_queue_lock, message_queue
+        message_queue_lock.acquire()
         message_queue.put(message)
-        message_queue_lock.release
+        message_queue_lock.release()
 
     def save_local_state(self, index):
         Snapshot.state_mutex.acquire()
@@ -105,17 +114,12 @@ def setup_send_channels():
 
 def send_message():
     while True:
-        lock.acquire()
+        message_queue_lock.acquire()
         if message_queue.qsize() > 0:
             message = message_queue.get()
-            message = json.loads(message)
             receiver = message["receiver_id"]
-            try:
-                send_channels[receiver].sendall(message)
-            except Exception:
-                import traceback
-                print traceback.format_exc()
-        lock.release()
+            send_channels[receiver].sendall(json.dumps(message))
+        message_queue_lock.release()
 
 def receive_message():
     while True:
@@ -126,9 +130,9 @@ def receive_message():
                     msg = json.loads(msg)
                     msg_type = msg["message_type"]
                     if msg_type == "TRANSFER":
-                        Snapshot.rcv_money(message)
+                        Snapshot.rcv_money(msg)
                     else:
-                        Snapshot.check_marker_status(message)
+                        Snapshot.check_marker_status(msg)
             except:
                 time.sleep(1)
                 continue
@@ -141,14 +145,16 @@ with open("config.json", "r") as configFile:
     config = json.load(configFile)
 
 Snapshot.process_id = raw_input()
-send_channels = {}
-recv_channels = []
-message_queue = Queue.Queue()
-lock=threading.Lock()
-message_queue_lock = threading.Lock()
+
+# temp stub to check transfer
+snapshot = Snapshot()
+if Snapshot.process_id == "1":
+    snapshot.send_money(10, "2")
+
 HOST = ''
 PORT = config[Snapshot.process_id]
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 s.setblocking(0)
 s.bind((HOST, PORT))
 s.listen(10)
@@ -163,6 +169,6 @@ start_new_thread(receive_message, ())
 
 while True:
     message = raw_input("Enter message in the format RECEIVER,SENDER,MESSAGE ")
-    lock.acquire()
+    message_queue_lock.acquire()
     message_queue.put(message)
-    lock.release()
+    message_queue_lock.release()
