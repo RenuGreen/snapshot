@@ -43,9 +43,9 @@ class Snapshot:
         self.send_broadcast_message(message)
 
     def send_message(self, message):
-        pass
-
-        # send message, HOW TO?
+        message_queue_lock.acquire
+        message_queue.put(message)
+        message_queue_lock.release
 
     def save_local_state(self, index):
         Snapshot.state_mutex.acquire()
@@ -68,9 +68,9 @@ class Snapshot:
         for i in config.keys():
             if i != Snapshot.process_id:
                 message['receiver_id'] = i
-                pass
-            # send message, HOW TO?
-
+                message_queue_lock.acquire()
+                message_queue.put(message)
+                message_queue_lock.release()
 
 
 def setup_receive_channels(s):
@@ -106,7 +106,8 @@ def send_message():
         lock.acquire()
         if message_queue.qsize() > 0:
             message = message_queue.get()
-            receiver = message.split(',')[0]
+            message = json.loads(message)
+            receiver = message["receiver_id"]
             try:
                 send_channels[receiver].sendall(message)
             except Exception:
@@ -143,6 +144,7 @@ send_channels = {}
 recv_channels = []
 message_queue = Queue.Queue()
 lock=threading.Lock()
+message_queue_lock = threading.Lock()
 HOST = ''
 PORT = config[Snapshot.process_id]
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
