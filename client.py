@@ -76,11 +76,13 @@ class Snapshot:
     # add to all channels for which snapshot and channel not finished
 
     def send_broadcast_message(self, message):
+        global message_queue_lock, message_queue
         for i in config.keys():
             if i != Snapshot.process_id:
-                message['receiver_id'] = i
+                message_copy = dict(message)
+                message_copy['receiver_id'] = str(i)
                 message_queue_lock.acquire()
-                message_queue.put(message)
+                message_queue.put(message_copy)
                 message_queue_lock.release()
 
 
@@ -114,12 +116,16 @@ def setup_send_channels():
 
 def send_message():
     while True:
-        message_queue_lock.acquire()
         if message_queue.qsize() > 0:
-            message = message_queue.get()
-            receiver = message["receiver_id"]
-            send_channels[receiver].sendall(json.dumps(message))
-        message_queue_lock.release()
+            try:
+                message_queue_lock.acquire()
+                message = message_queue.get()
+                message_queue_lock.release()
+                receiver = message["receiver_id"]
+                send_channels[receiver].sendall(json.dumps(message))
+            except:
+                print traceback.print_exc()
+
 
 def receive_message():
     while True:
@@ -127,6 +133,7 @@ def receive_message():
             try:
                 msg = socket.recv(4096)
                 if msg:
+                    print msg
                     msg = json.loads(msg)
                     msg_type = msg["message_type"]
                     if msg_type == "TRANSFER":
@@ -168,7 +175,6 @@ start_new_thread(send_message, ())
 start_new_thread(receive_message, ())
 
 while True:
-    message = raw_input("Enter message in the format RECEIVER,SENDER,MESSAGE ")
-    message_queue_lock.acquire()
-    message_queue.put(message)
-    message_queue_lock.release()
+    message = raw_input("Enter SNAPSHOT: ")
+    if message == "SNAPSHOT":
+        snapshot.start_snapshot(1)
