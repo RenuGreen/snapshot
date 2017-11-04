@@ -28,9 +28,6 @@ class Snapshot:
         Snapshot.balance_mutex.acquire()
         Snapshot.balance -= amount
         Snapshot.balance_mutex.release()
-        print "sending money to " + str(receiver_id)
-        print Snapshot.balance
-        print "------------------\n"
         message = {'receiver_id':receiver_id, 'sender_id': Snapshot.process_id, 'message_type': 'TRANSFER', 'amount': amount}
         self.send_message(message)
 
@@ -38,9 +35,6 @@ class Snapshot:
     def rcv_money(message):
         Snapshot.balance_mutex.acquire()
         Snapshot.balance += message['amount']
-        print "received money from " + str(message["sender_id"])
-        print Snapshot.balance
-        print "------------------\n"
         Snapshot.balance_mutex.release()
 
     def start_snapshot(self, snapshot_identifier):
@@ -116,7 +110,6 @@ class Snapshot:
         global message_queue_lock, message_queue
         for i in config.keys():
             if i != Snapshot.process_id:
-                time.sleep(5)
                 message_copy = dict(message)
                 message_copy['receiver_id'] = str(i)
                 message_queue_lock.acquire()
