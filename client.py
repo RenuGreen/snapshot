@@ -187,11 +187,6 @@ with open("config.json", "r") as configFile:
 
 Snapshot.process_id = raw_input()
 
-# temp stub to check transfer
-snapshot = Snapshot()
-if Snapshot.process_id == "1":
-    snapshot.send_money(10, "2")
-
 HOST = ''
 PORT = config[Snapshot.process_id]
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -213,4 +208,4 @@ while True:
     message = raw_input("Enter SNAPSHOT: ")
     if message == "SNAPSHOT":
         Snapshot.snapshot_id += 1
-        snapshot.start_snapshot((Snapshot.snapshot_id, Snapshot.process_id))
+        Snapshot.start_snapshot((Snapshot.snapshot_id, Snapshot.process_id))
