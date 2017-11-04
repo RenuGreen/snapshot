@@ -43,6 +43,7 @@ class Snapshot:
         #snapshot_identifier = (Snapshot.snapshot_id, Snapshot.process_id) in case of terminal input
         self.save_local_state(snapshot_identifier)
         self.send_marker(snapshot_identifier)
+        time.sleep(10)
 
     def check_marker_status(self, message):
         if message['snapshot_id'] not in Snapshot.states:
@@ -99,12 +100,11 @@ class Snapshot:
     def save_channel_state(self, message):
         for i in Snapshot.states:
             if not Snapshot.states[i]['is_finished']:
-                for j in Snapshot.states[i]['channels']:
-                    channel_id = Snapshot.states[i]['channels'][j]
-                    if not channel_id['is_finished']:
-                        Snapshot.state_mutex.acquire()
-                        channel_id['messages'].append(message)
-                        Snapshot.state_mutex.release()
+                channel_id = Snapshot.states[i]['channels'][message['sender_id']]
+                if not channel_id['is_finished']:
+                    Snapshot.state_mutex.acquire()
+                    channel_id['messages'].append(message)
+                    Snapshot.state_mutex.release()
 
     # add to all channels for which snapshot and channel not finished
 
@@ -169,7 +169,6 @@ def receive_message():
                 message = socket.recv(4096)
                 r = re.split('(\{.*?\})(?= *\{)', message)
                 for msg in r:
-                    print 'extracted message', msg
                     if msg == '\n' or msg == '' or msg is None:
                         continue
                     try:
@@ -192,7 +191,7 @@ def receive_message():
 
 def make_transfer():
     while True:
-        time.sleep(10)
+        time.sleep(5)
         receiver = random.randint(1,3)
         if not receiver == int(Snapshot.process_id):
             snap_obj.send_money(10, str(receiver))
