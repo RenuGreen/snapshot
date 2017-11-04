@@ -42,10 +42,32 @@ class Snapshot:
         self.send_marker(snapshot_identifier)
 
     def check_marker_status(self, message):
-        pass
+        if message['snapshot_id'] not in Snapshot.states:
+            self.start_snapshot(message['snapshot_id'])
+
+        #this code runs in both cases
+        Snapshot.state_mutex.acquire()
+        Snapshot.states[message['snapshot_id']]['channels'][message['sender_id']]['is_finished'] = True
+        Snapshot.state_mutex.release()
+        self.check_snapshot_status(message['snapshot_id'])
+
+    def check_snapshot_status(self, snapshot_identifier):
+        all_completed = True
+        for i in Snapshot.states[snapshot_identifier]['channels']:
+            channel_id = Snapshot.states[snapshot_identifier]['channels'][i]
+            if not channel_id['is_finished']:
+                all_completed = False
+                break
+        if all_completed:
+            Snapshot.state_mutex.acquire()
+            Snapshot.states[message['snapshot_id']]['is_finished'] = True
+            Snapshot.state_mutex.release()
+            print Snapshot.states
+
+
     # 2 cases possible
     # 1. (Snapshot_id, process_id) not present in Snapshot_status , call start_snapshot(message['snapshot_id']), mark receiver channel as finished so that msgs not saved for this channel
-    # 2. (Snapshot_id, process_id) present in Snapshot_status , mark receiver channel as finished so that no further msgs saved for this channel, check if all channels finished, mark snapshot as finshed
+    # 2. (Snapshot_id, process_id) present in Snapshot_status , mark receiver channel as finished so that no further msgs saved for this channel, check if all channels finished, mark snapshot as finished
 
     def send_marker(self, snapshot_identifier):
         message = {'sender_id': Snapshot.process_id, 'message_type': 'MARKER', 'snapshot_id': snapshot_identifier}
@@ -71,7 +93,13 @@ class Snapshot:
         Snapshot.state_mutex.release()
 
     def save_channel_state(self, message):
-        pass
+        for i in Snapshot.states:
+            if not Snapshot.states[i]['is_finished']:
+                for j in Snapshot.states[i]['channels']:
+                    channel_id = Snapshot.states[i]['channels'][j]
+                    if not channel_id:
+                        channel_id['messages'].append(message)
+
     # add to all channels for which snapshot and channel not finished
 
     def send_broadcast_message(self, message):
@@ -136,6 +164,7 @@ def receive_message():
                     msg_type = msg["message_type"]
                     if msg_type == "TRANSFER":
                         Snapshot.rcv_money(msg)
+                        Snapshot.save_channel_state(msg)
                     else:
                         msg["snapshot_id"] = tuple(msg["snapshot_id"])
                         Snapshot.check_marker_status(msg)
@@ -183,4 +212,5 @@ start_new_thread(make_transfer, ())
 while True:
     message = raw_input("Enter SNAPSHOT: ")
     if message == "SNAPSHOT":
-        pass
+        Snapshot.snapshot_id += 1
+        snapshot.start_snapshot((Snapshot.snapshot_id, Snapshot.process_id))
