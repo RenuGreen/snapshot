@@ -5,6 +5,8 @@ import time
 import json
 import Queue
 import traceback, random
+import re
+import traceback
 
 send_channels = {}
 recv_channels = []
@@ -32,7 +34,7 @@ class Snapshot:
     @staticmethod
     def rcv_money(message):
         Snapshot.balance_mutex.acquire()
-        Snapshot.balance += message['amount'];
+        Snapshot.balance += message['amount']
         print Snapshot.balance
         Snapshot.balance_mutex.release()
 
@@ -42,6 +44,8 @@ class Snapshot:
         self.send_marker(snapshot_identifier)
 
     def check_marker_status(self, message):
+        print "Received marker:"
+        print message
         if message['snapshot_id'] not in Snapshot.states:
             self.start_snapshot(message['snapshot_id'])
 
@@ -49,6 +53,8 @@ class Snapshot:
         Snapshot.state_mutex.acquire()
         Snapshot.states[message['snapshot_id']]['channels'][message['sender_id']]['is_finished'] = True
         Snapshot.state_mutex.release()
+        print 'States in line 54'
+        print Snapshot.states
         self.check_snapshot_status(message['snapshot_id'])
 
     def check_snapshot_status(self, snapshot_identifier):
@@ -60,8 +66,9 @@ class Snapshot:
                 break
         if all_completed:
             Snapshot.state_mutex.acquire()
-            Snapshot.states[message['snapshot_id']]['is_finished'] = True
+            Snapshot.states[snapshot_identifier]['is_finished'] = True
             Snapshot.state_mutex.release()
+            print 'in check_snapshot_status'
             print Snapshot.states
 
 
@@ -91,6 +98,8 @@ class Snapshot:
         Snapshot.states[index]['local_state'] = Snapshot.balance
         Snapshot.balance_mutex.release()
         Snapshot.state_mutex.release()
+        print 'save_local_state'
+        print Snapshot.states
 
     def save_channel_state(self, message):
         for i in Snapshot.states:
@@ -109,6 +118,8 @@ class Snapshot:
                 message_copy = dict(message)
                 message_copy['receiver_id'] = str(i)
                 message_queue_lock.acquire()
+                print 'In send_broadcast_message'
+                print message_copy
                 message_queue.put(message_copy)
                 message_queue_lock.release()
 
@@ -158,23 +169,33 @@ def receive_message():
     while True:
         for socket in recv_channels:
             try:
-                msg = socket.recv(4096)
-                if msg:
-                    msg = json.loads(msg)
-                    msg_type = msg["message_type"]
-                    if msg_type == "TRANSFER":
-                        Snapshot.rcv_money(msg)
-                        Snapshot.save_channel_state(msg)
-                    else:
-                        msg["snapshot_id"] = tuple(msg["snapshot_id"])
-                        Snapshot.check_marker_status(msg)
+                message = socket.recv(4096)
+                r = re.split('(\{.*?\})(?= *\{)', message)
+                for msg in r:
+                    print 'extracted message', msg
+                    if message == '\n':
+                        continue
+                    try:
+                        print 'Received ', msg
+                        msg = json.loads(msg)
+                        msg_type = msg["message_type"]
+                        if msg_type == "TRANSFER":
+                            snap_obj.rcv_money(msg)
+                            snap_obj.save_channel_state(msg)
+                        else:
+                            msg["snapshot_id"] = tuple(msg["snapshot_id"])
+                            snap_obj.check_marker_status(msg)
+                    except:
+                        print 'In exception'
+                        print traceback.print_exc()
+                        print msg
             except:
                 time.sleep(1)
                 continue
 
 def make_transfer():
     while True:
-        time.sleep(3)
+        time.sleep(2)
         receiver = random.randint(1,3)
         if not receiver == int(Snapshot.process_id):
             snap_obj.send_money(10, str(receiver))
