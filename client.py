@@ -32,12 +32,13 @@ class Snapshot:
         message = {'receiver_id':receiver_id, 'sender_id': Snapshot.process_id, 'message_type': 'TRANSFER', 'amount': amount}
         self.send_message(message)
 
-    @staticmethod
-    def rcv_money(message):
+
+    def rcv_money(self, message):
         Snapshot.balance_mutex.acquire()
         Snapshot.balance += message['amount']
         print 'received money', str(Snapshot.balance)
         Snapshot.balance_mutex.release()
+        self.save_channel_state(message)
 
     def start_snapshot(self, snapshot_identifier):
         #snapshot_identifier = (Snapshot.snapshot_id, Snapshot.process_id) in case of terminal input
@@ -176,10 +177,12 @@ def receive_message():
                         msg = json.loads(msg)
                         msg_type = msg["message_type"]
                         if msg_type == "TRANSFER":
+                            #start_new_thread(snap_obj.rcv_money, (msg,))
                             snap_obj.rcv_money(msg)
-                            snap_obj.save_channel_state(msg)
+                            #snap_obj.save_channel_state(msg)
                         else:
                             msg["snapshot_id"] = tuple(msg["snapshot_id"])
+                            #start_new_thread(snap_obj.check_marker_status, (msg,))
                             snap_obj.check_marker_status(msg)
                     except:
                         print 'In exception'
