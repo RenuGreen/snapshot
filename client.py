@@ -175,9 +175,9 @@ def receive_message():
 def make_transfer():
     while True:
         time.sleep(3)
-        receiver = random.randint()
-        snapshot.send_money(10, )
-
+        receiver = random.randint(1,3)
+        if not receiver == int(Snapshot.process_id):
+            snapshot.send_money(10, str(receiver))
 
 ################################################################################
 
