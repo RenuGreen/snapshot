@@ -49,8 +49,6 @@ class Snapshot:
         self.send_marker(snapshot_identifier)
 
     def check_marker_status(self, message):
-        print "Received marker:"
-        print message
         if message['snapshot_id'] not in Snapshot.states:
             self.start_snapshot(message['snapshot_id'])
 
@@ -58,8 +56,6 @@ class Snapshot:
         Snapshot.state_mutex.acquire()
         Snapshot.states[message['snapshot_id']]['channels'][message['sender_id']]['is_finished'] = True
         Snapshot.state_mutex.release()
-        print 'States in line 54'
-        print Snapshot.states
         self.check_snapshot_status(message['snapshot_id'])
 
     def check_snapshot_status(self, snapshot_identifier):
@@ -74,7 +70,7 @@ class Snapshot:
             Snapshot.states[snapshot_identifier]['is_finished'] = True
             Snapshot.state_mutex.release()
             print 'in check_snapshot_status'
-            print Snapshot.states
+            print Snapshot.states[snapshot_identifier]
 
 
     # 2 cases possible
@@ -103,8 +99,6 @@ class Snapshot:
         Snapshot.states[index]['local_state'] = Snapshot.balance
         Snapshot.balance_mutex.release()
         Snapshot.state_mutex.release()
-        print 'save_local_state'
-        print Snapshot.states
 
     def save_channel_state(self, message):
         for i in Snapshot.states:
@@ -201,7 +195,7 @@ def receive_message():
 
 def make_transfer():
     while True:
-        time.sleep(2)
+        time.sleep(10)
         receiver = random.randint(1,3)
         if not receiver == int(Snapshot.process_id):
             snap_obj.send_money(10, str(receiver))
