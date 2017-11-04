@@ -173,7 +173,7 @@ def receive_message():
                 r = re.split('(\{.*?\})(?= *\{)', message)
                 for msg in r:
                     print 'extracted message', msg
-                    if message == '\n':
+                    if msg == '\n':
                         continue
                     try:
                         print 'Received ', msg
