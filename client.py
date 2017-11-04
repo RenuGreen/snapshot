@@ -1,11 +1,10 @@
 import socket
-import sys
 from thread import *
 import threading
 import time
 import json
 import Queue
-import traceback
+import traceback, random
 
 send_channels = {}
 recv_channels = []
@@ -133,16 +132,22 @@ def receive_message():
             try:
                 msg = socket.recv(4096)
                 if msg:
-                    print msg
                     msg = json.loads(msg)
                     msg_type = msg["message_type"]
                     if msg_type == "TRANSFER":
                         Snapshot.rcv_money(msg)
                     else:
+                        msg["snapshot_id"] = tuple(msg["snapshot_id"])
                         Snapshot.check_marker_status(msg)
             except:
                 time.sleep(1)
                 continue
+
+def make_transfer():
+    while True:
+        time.sleep(3)
+        receiver = random.randint()
+        snapshot.send_money(10, )
 
 
 ################################################################################
@@ -173,8 +178,9 @@ t1.start()
 t1.join()
 start_new_thread(send_message, ())
 start_new_thread(receive_message, ())
+start_new_thread(make_transfer, ())
 
 while True:
     message = raw_input("Enter SNAPSHOT: ")
     if message == "SNAPSHOT":
-        snapshot.start_snapshot(1)
+        pass
