@@ -65,7 +65,7 @@ class Snapshot:
             Snapshot.state_mutex.acquire()
             Snapshot.states[snapshot_identifier]['is_finished'] = True
             Snapshot.state_mutex.release()
-            print 'in check_snapshot_status'
+            print 'in check_snapshot_status', str(snapshot_identifier)
             print Snapshot.states[snapshot_identifier]
 
 
@@ -101,8 +101,10 @@ class Snapshot:
             if not Snapshot.states[i]['is_finished']:
                 for j in Snapshot.states[i]['channels']:
                     channel_id = Snapshot.states[i]['channels'][j]
-                    if not channel_id:
+                    if not channel_id['is_finished']:
+                        Snapshot.state_mutex.acquire()
                         channel_id['messages'].append(message)
+                        Snapshot.state_mutex.release()
 
     # add to all channels for which snapshot and channel not finished
 
@@ -168,7 +170,7 @@ def receive_message():
                 r = re.split('(\{.*?\})(?= *\{)', message)
                 for msg in r:
                     print 'extracted message', msg
-                    if msg == '\n':
+                    if msg == '\n' or msg == '' or msg is None:
                         continue
                     try:
                         print 'Received ', msg
