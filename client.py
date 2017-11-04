@@ -177,7 +177,7 @@ def make_transfer():
         time.sleep(3)
         receiver = random.randint(1,3)
         if not receiver == int(Snapshot.process_id):
-            snapshot.send_money(10, str(receiver))
+            snap_obj.send_money(10, str(receiver))
 
 ################################################################################
 
@@ -186,6 +186,7 @@ with open("config.json", "r") as configFile:
     config = json.load(configFile)
 
 Snapshot.process_id = raw_input()
+snap_obj = Snapshot()
 
 HOST = ''
 PORT = config[Snapshot.process_id]
@@ -208,4 +209,4 @@ while True:
     message = raw_input("Enter SNAPSHOT: ")
     if message == "SNAPSHOT":
         Snapshot.snapshot_id += 1
-        Snapshot.start_snapshot((Snapshot.snapshot_id, Snapshot.process_id))
+        snap_obj.start_snapshot((Snapshot.snapshot_id, Snapshot.process_id))
