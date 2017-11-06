@@ -6,7 +6,9 @@ import json
 import Queue
 import traceback, random
 import re
-import traceback
+import logging
+
+logging.basicConfig(level = logging.INFO)
 
 send_channels = {}
 recv_channels = []
@@ -30,6 +32,9 @@ class Snapshot:
         Snapshot.balance_mutex.release()
         message = {'receiver_id':receiver_id, 'sender_id': Snapshot.process_id, 'message_type': 'TRANSFER', 'amount': amount}
         self.send_message(message)
+        logging.info(" Client {} sent ${} to Client {}".format(Snapshot.process_id, 10, receiver_id))
+        logging.info(" Client {} current balance: ${}\n".format(Snapshot.process_id, Snapshot.balance))
+        print("")
 
 
     def rcv_money(self, message):
@@ -37,6 +42,8 @@ class Snapshot:
         Snapshot.balance += message['amount']
         Snapshot.balance_mutex.release()
         self.save_channel_state(message)
+        logging.info(" Client {} received ${} from Client {}".format(Snapshot.process_id, 10, message["sender_id"]))
+        logging.info(" Client {} current balance: ${}\n".format(Snapshot.process_id, Snapshot.balance))
 
     def start_snapshot(self, snapshot_identifier):
         #snapshot_identifier = (Snapshot.snapshot_id, Snapshot.process_id) in case of terminal input
@@ -65,9 +72,17 @@ class Snapshot:
             Snapshot.state_mutex.acquire()
             Snapshot.states[snapshot_identifier]['is_finished'] = True
             Snapshot.state_mutex.release()
-            print 'in check_snapshot_status', str(snapshot_identifier)
-            print Snapshot.states[snapshot_identifier]
-
+            # print 'in check_snapshot_status', str(snapshot_identifier)
+            # print Snapshot.states[snapshot_identifier]
+            print "-------------------------------------------"
+            print "Snapshot id: " + str(snapshot_identifier)
+            print "Client {} balance: ${}".format(Snapshot.process_id, Snapshot.states[snapshot_identifier]['local_state'])
+            snapshot = Snapshot.states[snapshot_identifier]
+            for channel in snapshot["channels"]:
+                if len(snapshot["channels"][channel]["messages"]) > 0:
+                    for i in snapshot["channels"][channel]["messages"]:
+                        print "${} is being sent from Client {} to Client {}".format(i["amount"], i["sender_id"], i["receiver_id"])
+            print "-------------------------------------------"
 
     # 2 cases possible
     # 1. (Snapshot_id, process_id) not present in Snapshot_status , call start_snapshot(message['snapshot_id']), mark receiver channel as finished so that msgs not saved for this channel
@@ -114,8 +129,6 @@ class Snapshot:
                 message_copy = dict(message)
                 message_copy['receiver_id'] = str(i)
                 message_queue_lock.acquire()
-                print 'In send_broadcast_message'
-                print message_copy
                 message_queue.put(message_copy)
                 message_queue_lock.release()
 
@@ -170,22 +183,16 @@ def receive_message():
                 for msg in r:
                     if msg == '\n' or msg == '' or msg is None:
                         continue
-                    try:
-                        print 'Received ', msg
-                        msg = json.loads(msg)
-                        msg_type = msg["message_type"]
-                        if msg_type == "TRANSFER":
-                            #start_new_thread(snap_obj.rcv_money, (msg,))
-                            snap_obj.rcv_money(msg)
-                            #snap_obj.save_channel_state(msg)
-                        else:
-                            msg["snapshot_id"] = tuple(msg["snapshot_id"])
-                            #start_new_thread(snap_obj.check_marker_status, (msg,))
-                            snap_obj.check_marker_status(msg)
-                    except:
-                        print 'In exception'
-                        print traceback.print_exc()
-                        print msg
+                    msg = json.loads(msg)
+                    msg_type = msg["message_type"]
+                    if msg_type == "TRANSFER":
+                        #start_new_thread(snap_obj.rcv_money, (msg,))
+                        snap_obj.rcv_money(msg)
+                        #snap_obj.save_channel_state(msg)
+                    else:
+                        msg["snapshot_id"] = tuple(msg["snapshot_id"])
+                        #start_new_thread(snap_obj.check_marker_status, (msg,))
+                        snap_obj.check_marker_status(msg)
             except:
                 time.sleep(1)
                 continue
@@ -194,7 +201,8 @@ def make_transfer():
     while True:
         time.sleep(5)
         receiver = random.randint(1,3)
-        if not receiver == int(Snapshot.process_id):
+        probability = random.random()
+        if not receiver == int(Snapshot.process_id) and probability < 0.5:
             snap_obj.send_money(10, str(receiver))
 
 ################################################################################
@@ -205,6 +213,7 @@ with open("config.json", "r") as configFile:
 
 Snapshot.process_id = raw_input()
 snap_obj = Snapshot()
+logging.info(" Client {} current balance: ${}".format(Snapshot.process_id, Snapshot.balance))
 
 HOST = ''
 PORT = config[Snapshot.process_id]
